@@ -1,0 +1,19 @@
+<html>
+	<head>
+		<title></title>
+	</head>
+	<body>		
+<div class="video" style="width: 1000px;height: 600px;"></div>
+<script src="ckplayer/ckplayer.js" type="text/javascript" charset="utf-8"></script>
+	<script type="text/javascript">
+		var videoObject = {
+			container: '.video',//“#”代表容器的ID，“.”或“”代表容器的class
+			variable: 'player',//该属性必需设置，值等于下面的new chplayer()的对象
+			autoplay:true,//自动播放
+			html5m3u8:true,
+			video:'http://117.34.72.115:18080/13999990006/4.m3u8'//视频地址
+		};
+		var player=new ckplayer(videoObject);
+	</script>
+	</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<style type="text/css">
+			*{margin: 0;padding: 0;}
+			.box{width: 800px;background: antiquewhite;margin: 0 auto;position: relative;}
+			.video{position: absolute;width: 800px;height: 400px;}
+			.con{position: absolute;width: 100%;height: 32px;background: red;z-index: 9;bottom: 0;}
+		</style>
+		<script src="ckplayer/jquery-2.0.3.min.js" type="text/javascript" charset="utf-8"></script>
+		<script type="text/javascript" src="ckplayer/ckplayer.js"></script>
+	</head>
+
+	<body>
+		<div class="box" id="box">
+			<div class="video" id="video"></div>
+			<div class="con">
+				<button id="fullScreen">全屏</button>
+				<button id="exitScreen">退出全屏</button>
+				视频比例:
+				<select name="" id="size">
+					<option value="1">16:9</option>
+					<option value="2">4:3</option>
+				</select>
+				<button id="play">播放</button>
+			</div>
+		</div>
+		<script type="text/javascript">
+			var player;
+			var videoObject = {
+				container: '#video', //“#”代表容器的ID，“.”或“”代表容器的class
+				variable: 'player', //该属性必需设置，值等于下面的new chplayer()的对象
+				autoplay: true, //是否自动播放
+				debug: true, //是否开启调试模式
+				flashplayer: true, //强制使用flashplayer
+				seek: 0, //默认跳转的时间
+				video: 'rtmp://117.34.72.115:1935/live/13999990003-1' //视频地址
+			};
+			player = new ckplayer(videoObject);
+			function loadedHandler(){
+				player.changeControlBarShow(false);
+				player.videoProportion(1, 1);
+			}
+			
+			//重写全屏   進入全屏
+			function launchFullscreen(element) {
+				//此方法不可以在異步任務中執行，否則火狐無法全屏
+				if(element.requestFullscreen) {
+					element.requestFullscreen();
+				} else if(element.mozRequestFullScreen) {
+					element.mozRequestFullScreen();
+				} else if(element.msRequestFullscreen) {
+					element.msRequestFullscreen();
+				} else if(element.oRequestFullscreen) {
+					element.oRequestFullscreen();
+				} else if(element.webkitRequestFullscreen) {
+					element.webkitRequestFullScreen();
+				} else {
+					var docHtml = document.documentElement;
+					var docBody = document.body;
+					var videobox = document.getElementById('videobox');
+					var width = window.screen.width;
+					var height = window.screen.height;
+					var cssText = "width:" + width + ";height:" + height + ";overflow:hidden;";
+					docHtml.style.cssText = cssText;
+					docBody.style.cssText = cssText;
+					document.IsFullScreen = true;
+				}
+			}
+			
+			//退出全屏
+			function exitFullscreen() {
+				if(document.exitFullscreen) {
+					document.exitFullscreen();
+				} else if(document.msExitFullscreen) {
+					document.msExitFullscreen();
+				} else if(document.mozCancelFullScreen) {
+					document.mozCancelFullScreen();
+				} else if(document.oRequestFullscreen) {
+					document.oCancelFullScreen();
+				} else if(document.webkitExitFullscreen) {
+					document.webkitExitFullscreen();
+				} else {
+					var docHtml = document.documentElement;
+					var docBody = document.body;
+					var videobox = document.getElementById('videobox');
+					docHtml.style.cssText = "";
+					docBody.style.cssText = "";
+					videobox.style.cssText = "";
+					document.IsFullScreen = false;
+				}
+			}		
+			$("#fullScreen").click(function() {
+				var width = window.screen.width;
+				var height = window.screen.height;
+				var video = $('#box')[0];
+				launchFullscreen(video);//开启全屏
+				$("#box").css({
+					'width': width,
+					'height': height
+				})
+				$("#video").css({
+					'width': width,
+					'height': height
+				})
+			})
+			
+			$('#exitScreen').click(function() {
+				exitScreen();
+			})
+			
+			$(document).keyup(function(event){
+				switch(event.keyCode) {
+				 	case 27:
+				 		exitScreen();
+				 	case 96:
+				 		exitScreen();
+				}
+			});
+			
+			function exitScreen(){
+				$("#box").css({
+					'width': '800px',
+					'height': '450px'
+				})
+				$("#video").css({
+					'width': '800px',
+					'height': '450px'
+				})
+				exitFullscreen();//退出全屏
+			}
+			
+			// 切换比例
+			$('#size').change(function(){
+				var size = $(this).val();
+				switch (size){
+					case "1":
+						player.videoProportion(16, 9);
+						break;
+					case "2":
+						player.videoProportion(4, 3);
+						break;
+					default:
+						break;
+				}
+			})
+		</script>
+	</body>
+</html>

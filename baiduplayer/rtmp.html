@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title></title>
+		<script src="player/cyberplayer.js" type="text/javascript" charset="utf-8"></script>
+		<style type="text/css">
+			/*#playercontainer{
+				width: 100px;
+				height: 100px;
+			}*/
+			.jwplayer.jw-flag-user-inactive.jw-state-playing .jw-controlbar, .jwplayer.jw-flag-user-inactive.jw-state-playing .jw-dock, .jwplayer.jw-flag-user-inactive.jw-state-playing .jw-logo.jw-hide{
+				visibility: hidden;
+				opacity: 0;
+			}
+			.jwplayer.jw-flag-user-inactive.jw-state-buffering .jw-controlbar{
+				visibility: hidden;
+				opacity: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="playercontainer"></div>
+		<button id="small">变小</button>
+		<button id="screen">全屏</button>
+
+<script type="text/javascript">
+    var player = cyberplayer("playercontainer").setup({
+        width: 800,
+        height: 400,
+        file: "rtmp://117.34.72.115:1935/live/13999990003-1", // <—rtmp直播地址
+        autostart: true,
+        stretching: "fill",
+        volume: 100,
+        controls: true,
+        rtmp: {
+            reconnecttime: 5, // rtmp直播的重连次数
+            bufferlength: 1 // 缓冲多少秒之后开始播放 默认1秒
+        },
+        ak: "xxxxxxxxxxxxxxxx" // 公有云平台注册即可获得accessKey
+    });
+    console.log(player)
+    document.getElementById('small').onclick = function(){
+    	player.resize(600, 400);
+    }
+        document.getElementById('screen').onclick = function(){
+    	player.setFullscreen(true);
+    }
+    
+</script>
+	</body>
+</html>

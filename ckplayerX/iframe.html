@@ -1,0 +1,1274 @@
+/**
+ * @Author:      wangchao
+ * @DateTime:    2018-03-21
+ * @Description: 用户管理组件
+ */
+<template>
+	<div class="app-container">
+		<!-- 搜索条件 -->
+		<div class="filter-container">
+			<el-form :inline="true" :model="listQuery" class="demo-form-inline">
+				<el-form-item label="车牌号">
+					<el-input v-model="listQuery.carNo" placeholder="请输入车牌号" style="width: 90px;"></el-input>
+				</el-form-item>
+				<el-form-item label="组织机构">
+					<depart_select @deptIdChange="deptCurrentChange"></depart_select>
+				</el-form-item>
+				<el-form-item label="燃油类型">
+					<el-select v-model="listQuery.powerType" clearable placeholder="请选择燃油类型">
+						<el-option label="请选择" value=""></el-option>
+						<el-option
+						v-for="item in dictionaries.fuel_type"
+						:key="item.dictCode"
+						:label="item.dictName"
+						:value="item.dictCode">
+						</el-option>
+					</el-select>					 
+				</el-form-item>
+				<el-form-item label="车辆用途">
+					<el-select v-model="listQuery.useType" placeholder="请选择车辆用途" clearable>
+						<el-option label="请选择" value=""></el-option>
+						<el-option
+						v-for="item in dictionaries.car_use"
+						:key="item.dictCode"
+						:label="item.dictName"
+						:value="item.dictCode">
+						</el-option>
+					</el-select>
+				</el-form-item>
+				<el-form-item label="驾驶员">
+					<el-input v-model="listQuery.driverName" placeholder="驾驶员名称" style="width: 90px;"></el-input>
+				</el-form-item>
+				<el-form-item>
+					<el-button class="filter-item btnColor" type="primary" icon="el-icon-search" @click="getList">查询</el-button>
+				</el-form-item>
+				<el-form-item>
+					<el-button v-if="permBtn.car_add" class="filter-item btnColor" type="primary" icon="el-icon-plus" @click="handleCreate">新增</el-button>
+				</el-form-item>
+				<el-form-item>
+					<el-button v-if="permBtn.car_import" class="filter-item btnColor" type="primary" icon="el-icon-upload2" @click="importFormLists">导入</el-button>
+				</el-form-item>
+				<el-form-item>
+					<el-button v-if="permBtn.car_export" class="filter-item" type="primary" icon="el-icon-download" @click="exportFormLists">导出</el-button>
+				</el-form-item>
+			</el-form>
+		</div>
+		<!-- 表格 -->
+		<el-table ref="multipleTable" :data="list" :height="height" v-loading.body="listLoading" element-loading-text="拼命加载中" border fit highlight-current-row>
+			<el-table-column align="center" label='车牌号' prop="carNum"></el-table-column>
+			<el-table-column align="center" label="组织机构" prop="deptName"></el-table-column>
+			<el-table-column align="center" label="车辆颜色" prop="carColor"></el-table-column>
+		    <el-table-column align="center" label="车辆品牌" prop="carBrand"></el-table-column>
+			<el-table-column align="center" label="车辆型号" prop="carModel"></el-table-column>
+			<el-table-column align="center" label="燃油类型" prop="powerType"></el-table-column>
+			<el-table-column align="center" label="车辆用途" prop="useType"></el-table-column>
+			<el-table-column align="center" label="设备IMEI">
+				<template slot-scope="scope">
+					<!-- allowMobile 	Y:允许N:不允许-->
+					<div v-if="!scope.row.equImei"><span @click="openBindEquImei(scope.$index, scope.row)"  class="text-btn">绑定</span></div>
+					<div v-else>{{scope.row.equImei}}&nbsp;<span @click="openUnbindEquImei(scope.$index, scope.row)" class="text-btn">解绑</span></div>
+				</template></el-table-column>	
+			<el-table-column align="center" label="驾驶员">
+				<template slot-scope="scope">
+					<div v-if="!scope.row.driverName"><span @click="openBindDriver(scope.$index, scope.row)" class="text-btn">绑定</span></div>
+					<div v-else>{{scope.row.driverName}}&nbsp;<span @click="openUnbindDriver(scope.$index, scope.row)" class="text-btn">解绑</span></div>
+				</template>
+			</el-table-column>
+			<el-table-column align="center" label="操作">
+				<template slot-scope="scope">
+					<el-button v-if="permBtn.car_check" class="btn check" size="small" @click="check(scope.$index, scope.row)" title="查看"></el-button>
+					<el-button v-if="permBtn.car_Modify" class="btn update" size="small" @click="handleEdit(scope.$index, scope.row)" title="修改"></el-button>
+					<el-button v-if="permBtn.car_delete" class="btn delete" size="small" @click="handleDelete(scope.$index, scope.row)" title="删除"></el-button>
+				</template>
+			</el-table-column>
+		</el-table>
+		<!-- 分页 -->
+		<div class="pagination-container">
+			<el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page.sync="currPage" :page-sizes="[10,20,30, 50]" :page-size="listQuery.iDisplayLength" layout="total, sizes, prev, pager, next, jumper" :total="total">
+			</el-pagination>
+		</div>
+
+		<!--新增弹框-->
+		<el-dialog title="新增车辆" :visible.sync="addFormVisible" top="13%" lock-scroll class="boxres" :close-on-click-modal="false"
+			:close-on-press-escape="false">
+			<el-form class="small-space" ref="addDialogForm"  :rules="rulesAdd" :model="addCar" label-position="left" label-width="120px">
+				<el-row>
+					<el-col :span="12">
+						<div class="grid-content bg-purple">
+							<el-form-item label="车辆品牌：" prop="carBrand">
+								<el-select v-model="addCar.carBrand" clearable placeholder="请选择车辆品牌">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_brands"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>	
+							</el-form-item>						
+							<el-form-item label="车辆颜色：" prop="carColor">
+								<el-select v-model="addCar.carColor" clearable placeholder="请选择车辆颜色">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_color"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>	
+							</el-form-item>
+						    <el-form-item label="车辆用途：" prop="useType">
+								<el-select v-model="addCar.useType" clearable placeholder="请选择车辆用途">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_use"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+						    </el-form-item>
+							<el-form-item label="组织机构：" prop="deptId">
+								<div class="dialogDeptTree">
+									<el-tree
+										ref="addDeptTree"
+										:data="deptList"
+										highlight-current
+										show-checkbox
+										node-key="deptId"
+										:expand-on-click-node="false"
+										:props="defaultProps"
+										:check-strictly="true"
+										@check="deptTreeSelectChange">
+									</el-tree>
+								</div>
+							</el-form-item>
+						</div>
+					</el-col>
+					<el-col :span="12">
+				        <el-form-item label="车辆型号：" prop="carModel">
+							<el-select v-model="addCar.carModel" clearable placeholder="请选择车辆型号">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_model"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+					    </el-form-item>							
+						<el-form-item label="车牌号：" prop="carNum">
+							<el-input v-model="addCar.carNum" placeholder="车牌号"></el-input>
+						</el-form-item>
+                        <el-form-item label="车牌颜色：" prop="carPlateColor">
+							<el-select v-model="addCar.carPlateColor" clearable placeholder="请选择车牌颜色">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_plate_color"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+						</el-form-item>
+						<el-form-item label="燃油类型" prop="powerType">
+								 <el-select v-model="addCar.powerType" clearable placeholder="请选择燃油类型">
+									 <el-option label="请选择" value=""></el-option>
+									 <el-option
+									 v-for="item in dictionaries.fuel_type"
+									 :value="item.dictCode"
+									 :label="item.dictName"
+									 :key="item.dictName">
+									 </el-option>
+						        </el-select>					 
+				        </el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="addFormVisible = false">取 消</el-button>
+				<el-button type="primary" @click="handleCreateSubmit('addDialogForm')" class="btnColor">确 定</el-button>
+			</div>
+		</el-dialog>
+		<!--编辑-->
+		<el-dialog title="编辑车辆" :visible.sync="updateFormVisible" top="13%" lock-scroll class="boxres" :close-on-click-modal="false"
+			:close-on-press-escape="false">
+			<el-form class="small-space" ref="editDialogForm" :rules="rulesEdit" :model="editCar" label-position="left" label-width="120px">
+				<el-row>
+					<el-col :span="12">
+						<div class="grid-content bg-purple">
+							<el-form-item label="车辆品牌：" prop="carBrand">
+								<el-select v-model="editCar.carBrand" clearable placeholder="请选择车辆品牌">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_brands"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>	
+							</el-form-item>						
+							<el-form-item label="车辆颜色：" prop="carColor">
+								<el-select v-model="editCar.carColor" clearable placeholder="请选择车辆颜色">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_color"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>	
+							</el-form-item>
+						    <el-form-item label="车辆用途：" prop="useType">
+								<el-select v-model="editCar.useType" clearable placeholder="请选择车辆用途">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_use"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+						    </el-form-item>
+							<el-form-item label="组织机构：" prop="deptId">
+								<div class="dialogDeptTree">
+									<el-tree
+										ref="editDeptTree"
+										:data="deptList"
+										highlight-current
+										node-key="deptId"
+										:expand-on-click-node="false"
+										:props="defaultProps"
+										:check-strictly="true"
+										show-checkbox
+										@check="deptTreeSelectChange"
+										:default-checked-keys="editDeptDefaultCheck"
+										:default-expanded-keys="editDeptDefaultOpen">
+									</el-tree>
+								</div>
+							</el-form-item>
+						</div>
+					</el-col>
+					<el-col :span="12">
+				        <el-form-item label="车辆型号：" prop="carModel">
+							<el-select v-model="editCar.carModel" clearable placeholder="请选择车辆型号">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_model"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+					    </el-form-item>							
+						<el-form-item label="车牌号：" prop="carNum">
+							<el-input v-model="editCar.carNum" placeholder="车牌号"></el-input>
+						</el-form-item>
+                        <el-form-item label="车牌颜色：" prop="carPlateColor">
+							<el-select v-model="editCar.carPlateColor" clearable placeholder="请选择车牌颜色">
+									<el-option label="请选择" value=""></el-option>
+									<el-option
+									v-for="item in dictionaries.car_plate_color"
+									:value="item.dictCode"
+									:label="item.dictName"
+									:key="item.dictName">
+									</el-option>
+								</el-select>
+						</el-form-item>
+						<el-form-item label="燃油类型" prop="powerType">
+								 <el-select v-model="editCar.powerType" clearable placeholder="请选择燃油类型">
+									 <el-option label="请选择" value=""></el-option>
+									 <el-option
+									 v-for="item in dictionaries.fuel_type"
+									 :value="item.dictCode"
+									 :label="item.dictName"
+									 :key="item.dictName">
+									 </el-option>
+						        </el-select>					 
+				        </el-form-item>
+					</el-col>
+				</el-row>
+			</el-form>
+
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="updateFormVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="handleEditSubmit('editDialogForm')" class="btnColor">确 定</el-button>
+			</div>
+		</el-dialog>
+
+		<!--查看-->
+		<el-dialog title="查看车辆" :visible.sync="checkFormVisible" top="13%" lock-scroll class="boxres">
+			<el-form class="small-space" v-if="carInfo" label-position="left" label-width="120px">
+				<el-row>
+					<el-col :span="12">
+						<div class="grid-content bg-purple">
+							<el-form-item label="车辆品牌：">
+								<strong>{{carInfo.carBrandName}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆颜色：">
+								<strong>{{carInfo.carColorName}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆型号：">
+								<strong>{{carInfo.carModelName}}</strong>
+							</el-form-item>
+							<el-form-item label="车牌颜色：">
+								<strong>{{carInfo.carPlateColorName}}</strong>
+							</el-form-item>																			
+						</div>
+					</el-col>
+					<el-col :span="12">
+						<el-form-item label="部门：">
+								<strong>{{carInfo.deptName}}</strong>
+							</el-form-item>
+							<el-form-item label="燃油类别：">
+								<strong>{{carInfo.powerTypeName}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆用途：">
+								<strong>{{carInfo.useTypeName}}</strong>
+							</el-form-item>	
+						<!-- <el-form-item label="车辆品牌编码：">
+								<strong>{{carInfo.carBrand}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆颜色编码：">
+								<strong>{{carInfo.carColor}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆型号编码：">
+								<strong>{{carInfo.carModel}}</strong>
+							</el-form-item>
+							<el-form-item label="车牌颜色编码：">
+								<strong>{{carInfo.carPlateColor}}</strong>
+							</el-form-item>
+							<el-form-item label="部门编码：">
+								<strong>{{carInfo.deptId}}</strong>
+							</el-form-item>
+							<el-form-item label="燃油类别编码：">
+								<strong>{{carInfo.powerType}}</strong>
+							</el-form-item>
+							<el-form-item label="车辆用途编码：">
+								<strong>{{carInfo.useType}}</strong>
+							</el-form-item>	 -->
+					</el-col>
+				</el-row>
+			</el-form>
+		</el-dialog>
+		<!--驾驶员绑定弹窗-->
+		<el-dialog title="驾驶员绑定"  :close-on-click-modal="false"
+			:close-on-press-escape="false" :visible.sync="driverFormVisible" width="730px" height="450px" top="13%" lock-scroll class="boxres">
+			<div>
+				<el-form :inline="true" :model="driverListQuery" style="text-align:center;" class="demo-form-inline">
+					<el-form-item   label="姓名：">
+						<el-input v-model="driverListQuery.driverName" size="227px" placeholder="请输入姓名"></el-input>
+					</el-form-item>
+					<el-form-item  style="text-align:center;" label="部门：">
+						<depart_select @deptIdChange="bindDeptCurrentChange"></depart_select>
+					</el-form-item>
+					<el-form-item>
+						<el-button class="filter-item btnColor" type="primary" icon="el-icon-search" @click="getDriverData">查询</el-button>
+					</el-form-item>
+				</el-form>
+				
+			</div>
+			<div style="width:100%; height:250px; margin:0 auto;">
+				<el-table class="driver-table" ref="driverTable" border height="250"  @current-change="handleRowChange" v-if="driverData"  :data="driverData" style = "width:100%" v-loading.body="listLoading" highlight-current-row element-loading-text="拼命加载中">
+					<el-table-column align="center" label='姓名' prop="driverName"></el-table-column>
+					<el-table-column align="center" label="部门" prop="deptName"></el-table-column>
+					<el-table-column align="center" label="联系电话" prop="phone"></el-table-column>
+					<el-table-column align="center" label="驾照等级" prop="licenceType"></el-table-column>
+					<el-table-column align="center" label="驾龄" prop="drivingAge"></el-table-column>
+		    	</el-table>
+			</div>
+			<!-- 分页 -->
+			<div style="text-align:center" class="pagination-container">
+				<el-pagination @size-change="driverHandleSizeChange" @current-change="driverHandleCurrentChange"   :page-size="listQuery.driveriDisplayLength"  :current-page.sync="driverCurrPage"   layout="total,  prev, pager, next, jumper" :total="driverTotal">
+				</el-pagination>
+			</div>
+		    <div slot="footer" class="dialog-footer">
+				<el-button @click="driverFormVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="bindDriverSubmit()" class="btnColor">保 存</el-button>
+			</div>
+		</el-dialog>
+		<!--设备绑定弹窗-->
+		<el-dialog title="设备绑定" :close-on-click-modal="false"
+			:close-on-press-escape="false"  :visible.sync="equImeiFormVisible" top="13%" width="488px"  height="280px" lock-scroll class="boxres equimei-dialog">
+			<el-form class="small-space" :rules="driverEquImeiRule" v-if="equImeiData"  ref="bindEquImeiForm"  label-position="left" label-width="120px">
+				<el-form-item label="车牌号：" prop="carNum">
+				    <el-input disabled  v-model="bindEquImeiForm.carNum" placeholder="车牌号"></el-input>
+			   </el-form-item>
+                <el-form-item label="设备IEMI：" prop="equId">
+					<el-select v-model="bindEquImeiForm.equId" clearable placeholder="请选择设备">
+						<el-option label="请选择" value=""></el-option>
+						<el-option
+						v-for="item in equImeiData"
+						:value="item.equId"
+						:label="item.phone"
+						:key="item.phone">
+						</el-option>
+					</el-select>
+				</el-form-item>
+				<p class="equimei-text">注：车牌号.设备号对应一致，系统才能绑定成功！</p>
+			</el-form>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="equImeiFormVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="bindEquImeiSubmit()" class="btnColor">保 存</el-button>
+			</div>
+		</el-dialog>
+		<!--驾驶员解绑弹窗-->
+		<el-dialog title="驾驶员解绑" :close-on-click-modal="false"
+			:close-on-press-escape="false" :visible.sync="UnbindDriverVisible" top="13%" width="488px"  height="280px" lock-scroll class="boxres equimei-dialog">
+			<div class="confirm">
+				<div class="confirm-top">
+					<i class="icon-c-zhuyi"></i>
+					<span class="confirm-text">
+						 您确定要解绑吗？
+					</span>
+				</div>
+				<div class="confirm-bottom">
+					<span class="delete-text-l">车牌：{{UnBindDriverData.carNum}}</span>
+					<span class="delete-text-r">驾驶员：{{UnBindDriverData.driverName}}</span>
+				</div>
+			</div>
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="UnbindDriverVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="UnbindDriverSubmit('addDialogForm')" class="btnColor">确 定</el-button>
+			</div>
+		</el-dialog>
+		<!--设备解绑弹窗-->
+		<el-dialog title="设备解绑" :close-on-click-modal="false"
+			:close-on-press-escape="false" :visible.sync="UnbindEquImeiVisible"  top="13%" width="488px" lock-scroll class="boxres equimei-dialog">
+			<div class="confirm">
+				<div class="confirm-top">
+					<i class="icon-c-zhuyi"></i>
+					<span class="confirm-text">
+						 您确定要解绑吗？
+					</span>
+				</div>
+				<div class="confirm-bottom">
+					<span class="delete-text-l">车牌：{{UnBindEquImeiData.carNum}}</span>
+					<span class="delete-text-r">设备：{{UnBindEquImeiData.equImei}}</span>
+				</div>
+			</div>
+			<div slot="footer" class="dialog-footer">				
+				<el-button @click="UnbindEquImeiVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="UnbindEquImeiSubmit('addDialogForm')" class="btnColor">确 定</el-button>
+			</div>
+		</el-dialog>
+		<!-- 导入 -->
+		<el-dialog title="导入数据" :visible.sync="importFormVisible" top="13%" width="600px" lock-scroll :close-on-click-modal="false"
+			:close-on-press-escape="false">
+			<div class="import-box">
+				<ul>
+					<li class="fl">
+						<p class="import-tip"><i class="el-icon-info"></i>导入说明</p>
+						<p>1.在导入数据前，先下载数据模版<a href="#">点击下载数据模版</a>；</p>
+						<p>2.填写数据并选择上传文件；</p>
+						<p>3.每次导入不超过65535条数据；</p>
+						<p>4.请注意数据导入格式必须填项。</p>
+					</li>
+					<li class="fr">
+						<el-upload
+						  	class="upload-demo"
+						  	drag
+						  	action="https://jsonplaceholder.typicode.com/posts/"
+						  	multiple>
+						  	<i class="el-icon-upload"></i>
+						  	<div class="el-upload__text"><em>点击上传</em></div>
+						  	<div class="el-upload__tip" slot="tip">文件类型（xls，xlsx）</div>
+						</el-upload>
+					</li>
+				</ul>
+			</div>
+				
+			<div slot="footer" class="dialog-footer">
+				<el-button @click="importFormVisible = false">取 消</el-button>
+				<el-button type="primary" @click.native.prevent="importFormSubmit()" class="btnColor">确 定</el-button>
+			</div>
+		</el-dialog>
+	</div>
+</template>
+
+<script>
+	import "../../assets/css/index.scss";
+	import { Message } from 'element-ui';
+	import { validate } from 'utils/validate';
+	import { utils } from 'src/utils';
+	import DepartSelect from '../../components/DepartSelect';
+	
+	export default {
+		components: {
+			'depart_select':DepartSelect,
+		 },
+		data() {
+			const vm =this;
+			//部门验证
+			const validateDepatTree = (rule, value, callback) => {
+				var keys = [];
+				if (vm.addFormVisible) { //新增
+					keys = vm.$refs.addDeptTree.getCheckedKeys();
+				} else {//编辑
+					keys = vm.$refs.editDeptTree.getCheckedKeys();
+				}
+				
+				if (keys.length == 0) {
+					callback(new Error('请选择部门！'));
+				} else {
+					callback();
+				}
+			};
+
+			//车牌号唯一性验证
+			const validateCardNum = (rule, value, callback) => {
+				if (vm.isValidate.isOk) {
+					if (vm.isValidate.CardNum) {
+						callback();
+					}
+				} else {
+					vm.isValidate.CardNum = false;
+				}				
+				if (value === '' || value === null) {
+					callback(new Error('车牌号不能为空！'));
+				} else {
+					let param = {};
+					param.carNum = value;
+					if (vm.updateFormVisible == true) {
+						param.carId = vm.editCar.carId;
+					}				
+					vm.$instance.post("/proxy/bizmgr/car/uniqueCarNum", param).then(res =>{
+						if(res.status == 200){
+							//唯一
+							if (res.data.success) { //新增提交
+								callback();
+							} else { //不唯一
+								callback(new Error("车牌号不唯一，请重新输入！"));
+							}
+						}else{
+							Message.error({message:"调用接口失败"});
+							callback(new Error("调用接口失败"));
+						}
+					}).catch(error => {callback(new Error("调用接口失败"));});
+				}
+			};
+			return {
+				//按钮的权限 查询query 新增add   true 显示  false 隐藏
+				permBtn:{
+	                car_add: false,
+					car_delete: false, 
+					car_Modify: false, 
+					car_check: false, 
+					car_import: false,
+					car_export: false,
+					equment_Rule: false,
+					driver_Rule: false
+				},
+				editDeptDefaultCheck: [], //编辑默认选择部门
+				editDeptDefaultOpen: [],//编辑默认打开
+				carInfo:null,//车辆详细
+				driverData:null,//未绑定驾驶员数据
+				equImeiData:null,//未绑定设备数据
+				list:null, //表格list
+				currPage: 1,//列表分页
+				driverCurrPage: 1,//驾驶员列表分页
+				total: null,
+				driverTotal: null,
+				listLoading: true,
+				height: 540,
+				deptList: [], //组织机构树数据
+				deptNames: "", //部门显示的名称
+				//列表查询参数
+				listQuery: {
+					iDisplayLength: 10,
+					iDisplayStart: 0,
+					powerType: "",
+					useType: "",
+					driverName: "",
+					deptId: "",
+					carNum: ""
+				},
+				//驾驶员列表查询参数
+				driverListQuery: {
+					iDisplayLength: 10,
+					iDisplayStart: 0,
+					driverName: '',
+					deptId: '',
+					isbind: false
+				},
+                //唯一性验证状态记录
+				isValidate:{
+					account: false,
+					phone: false,
+					isOk: false   //点击确定第一时间将此变量设置为true
+				},
+				
+				//树控件数据映射关系
+        		defaultProps: {
+          			children: 'children',
+          			label: 'deptName'
+				},				
+				//数据字典
+                dictionaries:{
+					car_color: [],
+					fuel_type: [],
+					car_plate_color: [],
+					car_use: [],
+					car_brands: [],
+					car_model: []
+				},
+				//新建数据
+				addCar: {
+					carBrand: "",
+					carColor:"",
+					carModel: "",
+					carNum: "",
+					deptId: "",
+					carPlateColor: "",
+					powerType: "",
+					usetype: "",
+				},
+				//绑定驾驶员数据
+				bindDriverData: {
+					carId: "",
+					driverId: "",
+					status: ""
+				},
+				//绑定设备数据
+				bindEquImeiForm: {
+					carId: "",
+					equId: "",
+					status: ""
+				},
+				//设备解绑数据
+				UnBindEquImeiData:{
+				   carId:"",
+				   equId:"",
+				   carNum:"",
+				   equImei:""
+				},
+				//驾驶员解绑数据
+				UnBindDriverData:{
+					carId:"",
+					driverId:"",
+					carNum:"",
+					driverName:""
+				},
+				//编辑数据
+				editCar: {
+					carId: "",
+					carBrand: "",
+					carColor:"",
+					carModel: "",
+					carNum: "",
+					deptId: "",
+					deptName: "",
+					carPlateColor: "",
+					powerType: "",
+					useType: "",
+				},
+				//新增编辑数据校验
+				rulesAdd: {
+					carBrand: [
+						{ required: true, message: '请选择车辆品牌', trigger: 'change' }
+					],
+					carColor: [
+						{ required: true, message: '请选择车辆颜色', trigger: 'change' }
+					],
+					carModel: [
+						{ required: true, message: '请选择车辆类型', trigger: 'change'}
+					],
+					carPlateColor: [
+						{ required: true, message: '请选择车牌颜色', trigger: 'change'}
+					],
+					useType: [
+						{ required: true, message: '请选择车辆用途', trigger: 'change'}
+					],
+					powerType: [
+						{ required: true, message: '请选择燃油类型', trigger: 'change'}
+					],
+					carNum: [
+						{ required: true, validator: validateCardNum, trigger: 'blur'},
+						{ required: true, validator: validate.validateCarNum, trigger: 'blur'}
+					],
+					deptId: [
+						{ required: true, validator: validateDepatTree }
+					]
+				},
+				rulesEdit: {
+					carBrand: [
+						{ required: true, message: '请选择车辆品牌', trigger: 'change' }
+					],
+					carColor: [
+						{ required: true, message: '请选择车辆颜色', trigger: 'change' }
+					],
+					carModel: [
+						{ required: true, message: '请选择车型', trigger: 'change'}
+					],
+					carPlateColor: [
+						{ required: true, message: '请选择车牌颜色', trigger: 'change'}
+					],
+					useType: [
+						{ required: true, message: '请选择车辆用途', trigger: 'change'}
+					],
+					powerType: [
+						{ required: true, message: '请选择燃油类型', trigger: 'change'}
+					],
+					carNum: [
+						{ required: true, validator: validateCardNum, trigger: 'blur'},
+						{ required: true, validator: validate.validateCarNum, trigger: 'blur'}
+					],
+					deptId: [
+						{ required: true, validator: validateDepatTree }
+					]
+				},
+				driverEquImeiRule: {
+                    equId: [
+						{required: true, message: '选择设备', trigger: 'blur'}
+					]
+				},
+				deptNameCheck: "", //查看需要的部门名称
+				roleNamesCheck: "", //查看需要的角色名称
+                // 弹窗
+				addFormVisible: false,
+				updateFormVisible: false,
+				checkFormVisible: false,
+				roleManFormVisible: false,
+				equImeiFormVisible: false,
+				driverFormVisible: false,
+				UnbindEquImeiVisible: false,
+				UnbindDriverVisible: false,
+				importFormVisible: false
+			}
+		},
+		mounted() {
+			var vm = this;
+			utils.getTableHeight((height)=>{
+				this.height = height;
+			});
+			vm.getPerm();
+			vm.getList();
+			vm.getDeptTreeData();
+			vm.getDictionaries();
+		},
+		methods: {
+			//获取当前页面的权限
+			getPerm(){
+				this.permBtn = utils.permsButton(this);
+			},
+			//获取列表数据
+			getList() {
+				var vm = this;
+				vm.listLoading = true;
+				//调用接口
+				let param = JSON.parse(JSON.stringify(vm.listQuery));
+		        vm.$instance.post("/proxy/bizmgr/car/findCarList", param).then(res =>{							
+		          if(res.status == 200){
+		                vm.list = res.data.data;
+						vm.total = res.data.contTotal;
+						vm.listLoading = false;
+		            }else{
+		                Message.error({message:"调用接口失败"});
+		                vm.listLoading = false;
+		            }
+		        }).catch(error => {vm.listLoading = false;});
+			},
+			//获取字典
+			getDictionaries() {
+				let arr = ["fuel_type","car_plate_color","car_use","car_brands","car_color","car_model"];
+				utils.batchDictsByCode(arr, data => {
+					this.dictionaries = data;
+				})
+			},
+			//获取未绑定驾驶员
+			getDriverData() {
+				var vm = this;			
+				//调用驾驶员列表接口
+				let param = JSON.parse(JSON.stringify(vm.driverListQuery));
+				vm.$instance.post("/proxy/bizmgr/driver/findDriverList", param).then(res =>{
+					if(res.status == 200){
+						vm.listLoading = false;
+						vm.driverData = res.data.data;
+						vm.driverTotal = res.data.contTotal;
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				    }).catch(error => {
+				});
+					
+			},
+			//获取未绑定驾设备
+			getEquImeiData(deptId) {
+				var vm = this;
+				let param = {
+				    deptId: deptId
+				};
+				vm.$instance.get("/proxy/bizmgr/equ/findUnboundEqus",{params: param}).then(res =>{
+					if(res.status == 200){
+						vm.listLoading = false;
+						vm.equImeiData = res.data;
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				}).catch(error => {});
+			},
+			//获取组织机构数据
+			getDeptTreeData() {			
+				var vm = this;
+				vm.$instance.get("/proxy/sysmgr/depart/departTree").then(res =>{
+					if(res.status == 200){
+						vm.deptList = res.data;
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				}).catch(error => {});
+			},
+			//根据Id获取数据
+			getCarData(carId, type) {
+				let vm = this;
+				let param = {};
+				param.carId = carId;
+				//调用接口
+				vm.$instance.get("/proxy/bizmgr/car/findCarInfo", {params: param}).then(res =>{
+					if(res.status == 200){
+						vm.carInfo = res.data
+						if(type == "edit"){
+							for (var i in this.editCar){
+								this.editCar[i] = this.editCar[i] || this.carInfo[i];
+							}
+							vm.editDeptDefaultCheck = [];
+							vm.editDeptDefaultCheck.push(vm.editCar.deptId);
+							vm.editDeptDefaultOpen = [];
+							vm.editDeptDefaultOpen.push(vm.editCar.deptId);
+							if (vm.$refs.editDeptTree) {
+								vm.$refs.editDeptTree.setCheckedKeys(vm.editDeptDefaultCheck);
+							}
+						}							
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				}).catch(error => {vm.checkFormVisible = false; vm.updateFormVisible = false; Message.error({message:"数据获取失败！"});});
+			},
+			//操作列表分页
+			handleSizeChange(val) {
+				this.listQuery.iDisplayLength = val;
+				this.getList();
+			},
+			//操作列表分页
+			handleCurrentChange(val) {
+				this.currPage = val;
+				//计算当前页从那条开始
+				this.listQuery.iDisplayStart = (this.currPage-1) * this.listQuery.iDisplayLength;
+				this.getList();
+			},
+			//操作驾驶员分页
+			driverHandleSizeChange(val) {
+				this.driverListQuery.iDisplayLength = val;
+				this.getList();
+			},
+			//操作驾驶员列表分页
+			driverHandleCurrentChange(val) {
+				this.driverCurrPage = val;
+				//计算当前页从那条开始
+				this.driverListQuery.iDisplayStart = (this.driverCurrPage-1) * this.driverCurrPage.iDisplayLength;
+				this.getList();
+			},		
+			deptCurrentChange(deptId) {
+				this.listQuery.deptId = deptId;
+			},
+			//组织机构下拉显示隐藏  出现则为 true，隐藏则为 false
+			bindDeptCurrentChange(deptId) {
+				this.driverListQuery.deptId = deptId;
+			},
+			
+			//打开新增弹窗
+			handleCreate() {
+				let obj = this.addCar;
+				for (const item in obj) {
+					if (obj.hasOwnProperty(item)) {
+						obj[item] = ""						
+					}
+				}				
+				this.addFormVisible = true;
+				if (this.$refs.addDeptTree) {
+					this.$refs.addDeptTree.setCheckedKeys([]);
+				}
+				this.resetForm("addDialogForm");
+			},
+			//新增确定
+			handleCreateSubmit(formName) {								
+				this.isValidate.isOk = true;
+				this.addCar.deptId = this.$refs.addDeptTree.getCheckedKeys()[0];
+				validate.isValidate(this, formName, (formData)=>{
+					if(formData.validates){
+						this.createSubmit();
+					}
+					this.isValidate.isOk = false;
+				});
+			},		
+			//新增车辆提交
+			createSubmit() {
+				var vm = this;
+				let params = JSON.parse(JSON.stringify(vm.addCar));
+				vm.$instance.post("/proxy/bizmgr/car/addCar", params).then(res =>{
+					if(res.status == 200){
+						if (res.data.success) {
+							Message.success({message: '添加成功！'});
+							vm.addFormVisible = false;
+							vm.getList();
+						} else {
+							Message.error({message:res.data.errorMsg});
+						}						
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				}).catch(error => {Message.error({message:"添加失败！"});});	
+			},
+			//点击选中行选择驾驶员
+			handleRowChange(val) {
+				this.bindDriverData.driverId = val.driverId;
+			},
+			//查看
+			check(index, row) {
+				this.getCarData(row.carId);
+				this.checkFormVisible = true;
+			},
+			//删除
+			handleDelete(index, row) {
+				var vm = this;
+				let param = {};
+				param.carId = row.carId;
+				//确定删除
+				this.$confirm('是否删除< '+ row.carNum +' >车辆！', '提示', {
+					confirmButtonText: '确定',
+					cancelButtonText: '取消',
+					type: 'warning'
+				}).then(() => {
+					//调用接口
+					vm.$instance.post("/proxy/bizmgr/car/deleteCar", param).then(res =>{
+						if(res.status == 200){
+							if (res.data.success) {
+								Message.success({message: '删除成功！'});
+								vm.getList();
+							} else {
+								Message.error({message:res.data.errorMsg});
+							}
+						}else{
+							Message.error({message:"调用接口失败"});
+						}
+					}).catch(error => {});
+				}).catch(() => {
+					Message.info({message: '已取消删除'});          
+				});
+			},
+			//修改获取信息
+			handleEdit(index, row) {
+				let obj = this.editCar;
+				for (const item in obj) {
+					if (obj.hasOwnProperty(item)) {
+						obj[item] = ""						
+					}
+				}
+				this.editCar.carId = row.carId;
+				this.getCarData(row.carId, 'edit')		
+				this.updateFormVisible = true;
+			},
+			//修改确定
+		    handleEditSubmit(formName) {
+				this.isValidate.isOk = true;
+				this.editCar.deptId = this.$refs.editDeptTree.getCheckedKeys()[0];
+				validate.isValidate(this, formName, (formData)=>{
+					if(formData.validates){
+						this.editSubmit();
+					}
+					vm.isValidate.isOk = false;
+				});
+			},
+			//修改提交
+		    editSubmit() {
+				var vm = this;
+				vm.$instance.post("/proxy/bizmgr/car/modifyCar", JSON.parse(JSON.stringify(vm.editCar))).then(res =>{
+					if(res.status == 200){
+						if (res.data.success) {
+							vm.updateFormVisible = false;
+							Message.success({message: '修改成功！'});
+							vm.getList();
+						} else {
+							Message.error({message:res.data.errorMsg});
+						}
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				}).catch(error => {vm.updateFormVisible = false;});
+			},
+			//设备绑定弹窗
+			openBindEquImei(index, row, Type) {
+				this.equImeiFormVisible = true;
+				this.getEquImeiData(row.deptId);
+				this.bindEquImeiForm.carId = row.carId;
+				this.bindEquImeiForm.carNum = row.carNum;
+			},
+			//驾驶员绑定弹窗
+			openBindDriver(index, row) {
+				this.driverFormVisible = true;
+				this.getDriverData();
+				this.bindDriverData.carId = row.carId;
+			},
+			//打开设备解绑弹窗
+			openUnbindEquImei(index, row, Type) {
+				var vm = this;
+				vm.UnBindEquImeiData.carNum = row.carNum;
+				vm.UnBindEquImeiData.equImei = row.equImei;
+				vm.UnBindEquImeiData.carId = row.carId;
+				vm.UnBindEquImeiData.equId = row.equId;
+				vm.UnBindEquImeiData.status = "N";
+				vm.UnbindEquImeiVisible = true;			
+			},
+			//打开驾驶员解绑弹窗
+			openUnbindDriver(index, row, Type) {
+				var vm = this;
+				let param = {};
+				vm.UnBindDriverData.carNum = row.carNum;
+				vm.UnBindDriverData.driverName= row.driverName;
+				vm.UnBindDriverData.carId = row.carId;
+				vm.UnBindDriverData.driverId= row.driverId;
+				vm.UnBindDriverData.status = "N";
+				vm.UnbindDriverVisible = true;
+			},
+			//设备解绑接口
+			UnbindEquImeiSubmit(){
+				debugger;
+				let vm = this;
+				let param = {
+					carId:  vm.UnBindEquImeiData.carId,
+					equId:  vm.UnBindEquImeiData.equId	,
+					status:  vm.UnBindEquImeiData.status,
+				}
+                vm.$instance.post("/proxy/bizmgr/car/bindUnbindEqu", param).then(res =>{
+					if(res.status == 200){
+						if (res.data.success) {
+							vm.UnbindEquImeiVisible = false;
+							Message.success({message: '解绑成功！'});
+							vm.getList();
+						} else {
+							Message.error({message:res.data.errorMsg});
+						}
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				})
+			},
+			//驾驶员解绑接口
+			UnbindDriverSubmit(){
+				let vm = this;
+				let param = {
+					carId:  vm.UnBindDriverData.carId,
+					driverId:  vm.UnBindDriverData.driverId	,
+					status:  vm.UnBindDriverData.status
+				}
+                vm.$instance.get("/proxy/bizmgr/car/bindUnbindDriver",{params: param}).then(res =>{
+					if(res.status == 200){
+						if (res.data.success) {
+							vm.UnbindDriverVisible = false;
+							Message.success({message: '解绑成功！'});
+							vm.getList();
+						} else {
+							Message.error({message:res.data.errorMsg});
+						}
+					}else{
+						Message.error({message:"调用接口失败"});
+					}
+				})
+			},
+			//驾驶员绑定接口
+			bindDriverSubmit() {
+				let vm = this;
+                if (vm.bindDriverData.driverId){
+					vm.bindDriverData.status = "Y";
+					let param = vm.bindDriverData;
+                    vm.$instance.get("/proxy/bizmgr/car/bindUnbindDriver",{params: param} ).then(res =>{
+						if(res.status == 200){
+							if (res.data.success) {
+								vm.driverFormVisible = false;
+								Message.success({message: '绑定成功！'});
+								vm.getList();
+							} else {
+								Message.error({message:res.data.errorMsg});
+							}
+						}else{
+							Message.error({message:"调用接口失败"});
+						}
+					})
+				}else{
+					Message.info({message: '请选择驾驶员'}); 
+				}
+			},
+            //设备绑定接口
+			bindEquImeiSubmit() {
+                if (this.bindEquImeiForm.equId){
+					this.bindEquImeiForm.status = "Y";
+					let param = this.bindEquImeiForm;
+                    this.$instance.post("/proxy/bizmgr/car/bindUnbindEqu", param).then(res =>{
+						if(res.status == 200){
+							if (res.data.success) {							
+								Message.success({message: '绑定成功！'});
+								this.equImeiFormVisible = false;
+								this.getList();
+							} else {
+								Message.error({message:res.data.errorMsg});
+							}
+						}else{
+							Message.error({message:"调用接口失败"});
+						}
+					})
+				}else{
+					Message.info({message: '请选择设备'}); 
+				}
+			},
+			resetForm(formName) {
+        		if (this.$refs[formName] !== undefined) {
+					this.$refs[formName].resetFields();
+				}
+			},
+			//新增编辑部门选择改变
+			deptTreeSelectChange(data, status){
+				if (status.checkedNodes.length == 0) {
+					return;
+				}
+				//设置只选择当前点击的
+				var checkKeys = [];
+				checkKeys.push(data.deptId);
+				if (this.addFormVisible) {//新增
+					this.$refs.addDeptTree.setCheckedKeys(checkKeys);
+				} else {//编辑
+					this.$refs.editDeptTree.setCheckedKeys(checkKeys);
+				}
+			},	
+      		//导入
+      		importFormLists() {
+				this.importFormVisible = true;
+      		},
+      		
+      		//导出
+      		exportFormLists() {
+				utils.exportLists(this.listQuery, "/proxy/bizmgr/car/export");
+      		},  
+		},
+		watch: {
+			driverFormVisible(curVal, oldVal) {
+                if(!oldVal){
+					this.bindDriverData.driverId = ''
+				}
+			},
+			equImeiFormVisible(curVal, oldVal) {
+                if(oldVal){
+					this.bindEquImeiForm.carId = '';
+					this.bindEquImeiForm.carNum = '';
+					this.bindEquImeiForm.equId = ''
+				}
+			}
+		}
+	}
+	
+</script>
+<style rel="stylesheet/scss" scope lang="scss">
+	.driver-table tbody tr:nth-child(odd){
+		background: #fff;
+	}
+	.device-imei>div>div {
+		cursor: pointer;
+		width: 160px;
+		height: 30px;
+		line-height: 30px;
+		padding: 0 10px;
+		color: #c0c4cc;
+		border: 1px solid #dcdfe6;
+		border-radius: 4px;
+	}
+	
+	.box .el-dialog {
+		width: 25%;
+	}
+	
+	.el-tabs__nav-wrap::after{
+		background: none;
+	}
+	
+	.el-tabs__item{
+		border: 1px solid #e9e9e9;
+		text-align: center;
+		border-radius: 4px;
+		-webkit-border-radius: 4px;
+    	-moz-border-radius: 4px;
+    	padding: 0 30px !important;
+	}
+	.el-tabs__item.is-active{
+		background: #1e4d78;
+		border: 1px solid #1e4d78;
+		color: #fff;
+	}
+	.el-tabs__active-bar{
+		background: none;
+	}
+	.box form{
+		padding-left: 50px;
+	}
+	.dialogDeptTree {
+		border: 1px solid #ddd;
+		max-height: 150px;
+		overflow-y: auto; 
+	}
+	.text-btn{
+		cursor: pointer;
+		color: blue;
+	}
+	.equimei-dialog{
+		.el-form-item__content{
+			width: 227px!important;
+			.el-select, .el-input{
+				width: 100%;
+			}
+		}
+		.equimei-text{
+			color: #969696;
+			font-size: 12px;
+			text-align: center;
+		}		
+	}
+	.confirm{
+		width: 430px;
+		height: 100px;
+		margin: 0 auto;
+		& > div{
+			width: 216px;
+			margin: 0 auto;
+			i{
+				display: inline-block;
+				width: 33px;
+				height: 33px;
+			}
+			.confirm-text{
+				display: inline-block;
+				color: black;
+				font-size: 22px;
+				font-weight: 700;
+			}
+			&.confirm-bottom{
+				span{
+					font-size: 12px;
+					display: inline-block;
+					width: 49%
+				}
+				.delete-text-l{
+					text-align: left;
+				}
+				.delete-text-r{
+					text-align: right;
+				}
+			}
+		}
+		.confirm-top{
+			margin-top: 30px;
+		}
+		.confirm-bottom{
+			margin-top: 30px;
+		}
+	}
+
+</style>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<link rel="stylesheet" type="text/css" href="css/video-js.css" />
+		<link rel="stylesheet" type="text/css" href="css/video.css" />
+		<style type="text/css">
+
+		</style>
+	</head>
+
+	<body>
+		<video id="myVideo" class="video-js vjs-default-skin">
+		  	<source src="" type="application/x-mpegURL"></source>
+		</video>
+		<button onclick="play(1)">CH1</button>
+		<button onclick="play(2)">CH2</button>
+	</body>
+	<script src="js/jquery.js" type="text/javascript" charset="utf-8"></script>
+	<script src="js/mui.min.js"></script>
+	<script src="js/video.min.js" type="text/javascript" charset="utf-8"></script>
+	<script src="js/videojs-contrib-hls.js" type="text/javascript" charset="utf-8"></script>
+	<script type="text/javascript">
+		mui.init();
+		var myVideo = videojs('myVideo',{  
+	        bigPlayButton : true,   
+	        textTrackDisplay : false,   
+	        posterImage: false,  
+	        errorDisplay : false,  
+	    })  
+		var width = $(window).width();
+		var height = (width * 9) / 16;
+		$('.video-js').css({width: width, height: height});
+		function play(index) {  
+			//不刷新页面更换视频播放源
+	        switch (index){
+	        	case 1:
+	        		myVideo.src({  
+			            type : 'application/x-mpegURL', //视频是转码格式,要换成转码的类型 
+			            src : 'http://aldirect.hls.huya.com/huyalive/52722768-52722768-226442564314595328-2705069248-10057-A-0-1_1200.m3u8'  
+			        })
+	        		myVideo.play(); 
+	        		break;
+	        	case 2:
+	        		myVideo.src({  
+			            type : 'application/x-mpegURL',  
+			            src : 'http://aldirect.hls.huya.com/huyalive/52722768-52722768-226442564314595328-2705069248-10057-A-0-1_1200.m3u8'  
+			        })
+	        		myVideo.play(); 
+	        		break;
+	        	default:
+	        		break;
+	        }
+	    }  
+	</script>
+
+</html>
